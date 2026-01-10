@@ -13,9 +13,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 interface TermsModalProps {
   open: boolean
   onAccept: () => void
+  disabled?: boolean
 }
 
-export function TermsModal({ open, onAccept }: TermsModalProps) {
+export function TermsModal({ open, onAccept, disabled }: TermsModalProps) {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="max-w-2xl" hideClose>
@@ -67,8 +68,8 @@ export function TermsModal({ open, onAccept }: TermsModalProps) {
           </div>
         </ScrollArea>
         <DialogFooter>
-          <Button onClick={onAccept} className="w-full">
-            Aceitar Termos
+          <Button onClick={onAccept} className="w-full" disabled={disabled}>
+            {disabled ? "Processando..." : "Aceitar Termos"}
           </Button>
         </DialogFooter>
       </DialogContent>
