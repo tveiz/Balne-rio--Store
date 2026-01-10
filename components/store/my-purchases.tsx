@@ -129,33 +129,55 @@ export function MyPurchases() {
 
                   {purchase.status === "approved" && purchase.product_key && (
                     <div className="space-y-2 pt-2 border-t">
-                      <p className="text-sm font-bold text-green-700 flex items-center gap-2">
-                        <Check className="w-4 h-4" />
-                        Sua Chave do Produto:
-                      </p>
-                      <div className="flex gap-2">
-                        <code className="flex-1 p-3 bg-green-50 border-2 border-green-200 rounded-lg text-sm font-mono font-bold break-all">
-                          {purchase.product_key}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0 bg-transparent"
-                          onClick={() => handleCopyKey(purchase.product_key!)}
-                        >
-                          {copiedKey === purchase.product_key ? (
-                            <>
-                              <Check className="w-4 h-4 mr-1" />
-                              Copiado!
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copiar
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      {purchase.product_key.includes("ESTOQUE INFINITO") || purchase.product_key.includes("🎫") ? (
+                        <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                          <p className="text-sm font-bold text-purple-900 flex items-center gap-2 mb-2">
+                            <Package className="w-5 h-5" />
+                            Produto de Estoque Infinito
+                          </p>
+                          <p className="text-sm text-purple-800 mb-3">
+                            Para receber este produto, você precisa abrir um ticket no nosso Discord informando esta
+                            compra.
+                          </p>
+                          <Button
+                            className="w-full bg-[#5865F2] hover:bg-[#4752C4]"
+                            onClick={() => window.open("https://discord.gg/PtAw6gDg8k", "_blank")}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Abrir Ticket no Discord
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm font-bold text-green-700 flex items-center gap-2">
+                            <Check className="w-4 h-4" />
+                            Sua Chave do Produto:
+                          </p>
+                          <div className="flex gap-2">
+                            <code className="flex-1 p-3 bg-green-50 border-2 border-green-200 rounded-lg text-sm font-mono font-bold break-all">
+                              {purchase.product_key}
+                            </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 bg-transparent"
+                              onClick={() => handleCopyKey(purchase.product_key!)}
+                            >
+                              {copiedKey === purchase.product_key ? (
+                                <>
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Copiado!
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-4 h-4 mr-1" />
+                                  Copiar
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
