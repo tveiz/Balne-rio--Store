@@ -60,28 +60,26 @@ export function AdminPurchases() {
       if (!purchase) return
 
       if (action === "approve") {
-        // Buscar uma chave disponível
-        const { data: key } = await supabase
-          .from("product_keys")
-          .select("*")
-          .eq("product_id", purchase.product_name) // Note: Precisaria do product_id real
-          .eq("is_used", false)
-          .limit(1)
+        const { data: purchaseData } = await supabase
+          .from("purchases")
+          .select("product_id, product_key")
+          .eq("id", id)
           .single()
 
-        if (key) {
-          // Marcar chave como usada
-          await supabase
-            .from("product_keys")
-            .update({ is_used: true, used_by: purchase.user_id, used_at: new Date().toISOString() })
-            .eq("id", key.id)
+        if (!purchaseData) {
+          addNotification({ type: "error", message: "Compra não encontrada" })
+          return
+        }
 
-          // Atualizar compra
-          await supabase.from("purchases").update({ status: "approved", product_key: key.key_value }).eq("id", id)
+        // Verificar se já é um produto de estoque infinito (já tem mensagem especial)
+        const isInfiniteProduct = purchaseData.product_key?.includes("estoque infinito")
 
-          // Enviar webhook
+        if (isInfiniteProduct) {
+          // Produto de estoque infinito, apenas aprovar sem buscar chave
+          await supabase.from("purchases").update({ status: "approved" }).eq("id", id)
+
           await sendDiscordWebhook(WEBHOOKS.PURCHASE, {
-            title: "✅ Compra Aprovada",
+            title: "✅ Compra de Estoque Infinito Aprovada",
             color: 0x00ff00,
             fields: [
               { name: "Cliente", value: purchase.users.name, inline: true },
@@ -89,21 +87,90 @@ export function AdminPurchases() {
               { name: "Produto", value: purchase.product_name, inline: true },
               { name: "Valor", value: `R$ ${purchase.amount_paid.toFixed(2)}`, inline: true },
               { name: "ID Compra", value: id, inline: true },
-              { name: "Chave Entregue", value: "✓ (Oculta)", inline: true },
+              { name: "Tipo", value: "Estoque Infinito", inline: true },
             ],
           })
 
-          addNotification({ type: "success", message: "Compra aprovada!" })
+          addNotification({ type: "success", message: "Compra de estoque infinito aprovada!" })
         } else {
-          addNotification({ type: "error", message: "Sem estoque disponível" })
+          // Produto normal, buscar chave disponível
+          const { data: key } = await supabase
+            .from("product_keys")
+            .select("*")
+            .eq("product_id", purchaseData.product_id)
+            .eq("is_used", false)
+            .limit(1)
+            .single()
+
+          if (key) {
+            // Marcar chave como usada
+            await supabase
+              .from("product_keys")
+              .update({ is_used: true, used_by: purchase.user_id, used_at: new Date().toISOString() })
+              .eq("id", key.id)
+
+            // Atualizar compra
+            await supabase.from("purchases").update({ status: "approved", product_key: key.key_value }).eq("id", id)
+
+            const { data: productData } = await supabase
+              .from("products")
+              .select("stock")
+              .eq("id", purchaseData.product_id)
+              .single()
+
+            if (
+              productData &&
+              productData.stock !== "inf" &&
+              productData.stock !== "INF" &&
+              typeof productData.stock === "number" &&
+              productData.stock > 0
+            ) {
+              await supabase
+                .from("products")
+                .update({ stock: productData.stock - 1 })
+                .eq("id", purchaseData.product_id)
+            }
+
+            // Enviar webhook
+            await sendDiscordWebhook(WEBHOOKS.PURCHASE, {
+              title: "✅ Compra Aprovada",
+              color: 0x00ff00,
+              fields: [
+                { name: "Cliente", value: purchase.users.name, inline: true },
+                { name: "Email", value: purchase.users.email, inline: true },
+                { name: "Produto", value: purchase.product_name, inline: true },
+                { name: "Valor", value: `R$ ${purchase.amount_paid.toFixed(2)}`, inline: true },
+                { name: "ID Compra", value: id, inline: true },
+                { name: "Chave Entregue", value: "✓ (Oculta)", inline: true },
+              ],
+            })
+
+            addNotification({ type: "success", message: "Compra aprovada e chave entregue!" })
+          } else {
+            addNotification({ type: "error", message: "Sem estoque disponível" })
+            return
+          }
         }
       } else {
         await supabase.from("purchases").update({ status: "rejected" }).eq("id", id)
+
+        await sendDiscordWebhook(WEBHOOKS.PURCHASE, {
+          title: "❌ Compra Rejeitada",
+          color: 0xff0000,
+          fields: [
+            { name: "Cliente", value: purchase.users.name, inline: true },
+            { name: "Email", value: purchase.users.email, inline: true },
+            { name: "Produto", value: purchase.product_name, inline: true },
+            { name: "ID Compra", value: id, inline: true },
+          ],
+        })
+
         addNotification({ type: "success", message: "Compra rejeitada" })
       }
 
       await loadPurchases()
     } catch (error) {
+      console.error("[v0] Error processing purchase:", error)
       addNotification({ type: "error", message: "Erro ao processar compra" })
     }
 
