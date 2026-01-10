@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CreditCard, Copy, Check } from "lucide-react"
+import { CreditCard, Copy, Check, ExternalLink } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -79,8 +79,9 @@ export function CheckoutModal({ open, onOpenChange, product, finalPrice, couponC
           amount_paid: finalPrice,
           payment_method: paymentMethod,
           coupon_used: couponCode || null,
-          status: "pending",
-          product_key: "🎫 Produto de estoque infinito - Abra ticket no Discord para receber",
+          status: "approved",
+          product_key:
+            "🎫 ESTOQUE INFINITO - Abra um ticket no Discord informando esta compra para receber seu produto: https://discord.gg/PtAw6gDg8k",
         }
 
         const { data: purchase, error } = await supabase.from("purchases").insert(purchaseData).select().single()
@@ -88,8 +89,8 @@ export function CheckoutModal({ open, onOpenChange, product, finalPrice, couponC
 
         if (user.email !== "tm9034156@gmail.com") {
           await sendDiscordWebhook(WEBHOOKS.PURCHASE, {
-            title: "🎫 Nova Compra - Estoque Infinito (Infinitas Compras)",
-            color: 0x00aaff,
+            title: "🎫 Nova Compra - Estoque Infinito",
+            color: 0x9b59b6,
             fields: [
               { name: "Cliente", value: user.name, inline: true },
               { name: "Email", value: user.email, inline: true },
@@ -98,27 +99,31 @@ export function CheckoutModal({ open, onOpenChange, product, finalPrice, couponC
               { name: "Cupom", value: couponCode || "Nenhum", inline: true },
               { name: "ID Compra", value: purchase.id, inline: false },
               {
-                name: "⚠️ Instrução",
+                name: "🔄 Tipo",
+                value: "Estoque Infinito - Pode ser comprado múltiplas vezes",
+                inline: false,
+              },
+              {
+                name: "📌 Ação Necessária",
                 value: "Cliente deve abrir ticket no Discord para receber o produto",
                 inline: false,
               },
-              { name: "📌 Nota", value: "Estoque infinito - produto pode ser comprado ilimitadamente", inline: false },
             ],
           })
 
           await sendDiscordWebhook(WEBHOOKS.GENERAL, {
-            title: "🎫 Compra Estoque Infinito Registrada",
-            description: `${user.name} (${user.email}) comprou **${product.name}** por R$ ${finalPrice.toFixed(2)}\n\n🔄 Estoque infinito ativo - Cliente deve abrir ticket no Discord`,
-            color: 0x00aaff,
+            title: "🎫 Compra Estoque Infinito",
+            description: `**${user.name}** (${user.email}) comprou **${product.name}** por **R$ ${finalPrice.toFixed(2)}**\n\n🔄 Produto de estoque infinito - Cliente precisa abrir ticket no Discord`,
+            color: 0x9b59b6,
             timestamp: new Date().toISOString(),
           })
         }
 
         addNotification({
-          type: "info",
+          type: "success",
           message:
-            "✅ Compra registrada com sucesso! Acesse nosso Discord e abra um ticket informando sua compra para receber o produto.",
-          duration: 8000,
+            "✅ Compra registrada! Acesse nosso Discord e abra um ticket informando esta compra para receber seu produto.",
+          duration: 10000,
         })
         setPurchaseComplete(true)
         setLoading(false)
@@ -255,20 +260,32 @@ export function CheckoutModal({ open, onOpenChange, product, finalPrice, couponC
             <h3 className="text-xl sm:text-2xl font-bold">Compra Realizada!</h3>
             <p className="text-sm sm:text-base text-muted-foreground px-4">
               {isInfiniteStock
-                ? "Acesse nosso Discord e abra um ticket informando sua compra para receber o produto."
+                ? "✅ Compra aprovada! Acesse nosso Discord e abra um ticket informando sua compra para receber o produto."
                 : paymentMethod === "simulacao"
                   ? "Seu produto já está disponível em 'Minhas Compras'"
                   : "Aguarde a aprovação do pagamento. Entre no Discord para suporte."}
             </p>
             {isInfiniteStock && (
-              <a
-                href="https://discord.gg/PtAw6gDg8k"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block"
-              >
-                <Button>Acessar Discord</Button>
-              </a>
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 mx-4">
+                <p className="text-sm font-semibold text-purple-900 mb-3">🎫 Como receber seu produto:</p>
+                <ol className="text-left text-sm text-purple-800 space-y-2 mb-4">
+                  <li>1. Clique no botão abaixo para acessar nosso Discord</li>
+                  <li>2. Abra um ticket de suporte</li>
+                  <li>3. Informe o nome do produto que você comprou</li>
+                  <li>4. Aguarde o atendimento para receber seu produto</li>
+                </ol>
+                <a
+                  href="https://discord.gg/PtAw6gDg8k"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block w-full"
+                >
+                  <Button className="w-full bg-[#5865F2] hover:bg-[#4752C4]">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Abrir Discord Agora
+                  </Button>
+                </a>
+              </div>
             )}
             {!isInfiniteStock && <Button onClick={() => onOpenChange(false)}>Fechar</Button>}
           </div>
