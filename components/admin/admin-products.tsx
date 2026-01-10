@@ -21,7 +21,7 @@ interface Product {
   description: string
   price: number
   photo_url: string
-  stock: number
+  stock: number | string
 }
 
 interface Category {
@@ -42,6 +42,7 @@ export function AdminProducts() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { addNotification } = useNotificationStore()
+  const [isInfiniteStock, setIsInfiniteStock] = useState(false)
 
   const loadData = async () => {
     const supabase = createClient()
@@ -65,6 +66,8 @@ export function AdminProducts() {
     const supabase = createClient()
 
     try {
+      const stockValue = isInfiniteStock ? "inf" : stockKeys.length
+
       if (editingId) {
         await supabase
           .from("products")
@@ -74,19 +77,20 @@ export function AdminProducts() {
             description,
             price: Number.parseFloat(price),
             photo_url: photoUrl,
-            stock: stockKeys.length,
+            stock: stockValue,
           })
           .eq("id", editingId)
 
-        // Deletar chaves antigas e adicionar novas
-        await supabase.from("product_keys").delete().eq("product_id", editingId)
-        if (stockKeys.length > 0) {
-          await supabase.from("product_keys").insert(
-            stockKeys.map((key) => ({
-              product_id: editingId,
-              key_value: key,
-            })),
-          )
+        if (!isInfiniteStock) {
+          await supabase.from("product_keys").delete().eq("product_id", editingId)
+          if (stockKeys.length > 0) {
+            await supabase.from("product_keys").insert(
+              stockKeys.map((key) => ({
+                product_id: editingId,
+                key_value: key,
+              })),
+            )
+          }
         }
 
         addNotification({ type: "success", message: "Produto atualizado!" })
@@ -99,12 +103,12 @@ export function AdminProducts() {
             description,
             price: Number.parseFloat(price),
             photo_url: photoUrl,
-            stock: stockKeys.length,
+            stock: stockValue,
           })
           .select()
           .single()
 
-        if (newProduct && stockKeys.length > 0) {
+        if (newProduct && !isInfiniteStock && stockKeys.length > 0) {
           await supabase.from("product_keys").insert(
             stockKeys.map((key) => ({
               product_id: newProduct.id,
@@ -133,6 +137,7 @@ export function AdminProducts() {
     setPhotoUrl("")
     setStockKeys([])
     setEditingId(null)
+    setIsInfiniteStock(false)
   }
 
   const handleEdit = async (product: Product) => {
@@ -143,16 +148,21 @@ export function AdminProducts() {
     setPrice(product.price.toString())
     setPhotoUrl(product.photo_url)
 
-    // Carregar chaves
-    const supabase = createClient()
-    const { data: keys } = await supabase
-      .from("product_keys")
-      .select("key_value")
-      .eq("product_id", product.id)
-      .eq("is_used", false)
+    if (product.stock === "inf" || product.stock === "INF") {
+      setIsInfiniteStock(true)
+      setStockKeys([])
+    } else {
+      setIsInfiniteStock(false)
+      const supabase = createClient()
+      const { data: keys } = await supabase
+        .from("product_keys")
+        .select("key_value")
+        .eq("product_id", product.id)
+        .eq("is_used", false)
 
-    if (keys) {
-      setStockKeys(keys.map((k) => k.key_value))
+      if (keys) {
+        setStockKeys(keys.map((k) => k.key_value))
+      }
     }
   }
 
@@ -240,35 +250,48 @@ export function AdminProducts() {
 
           <ImageUpload value={photoUrl} onChange={setPhotoUrl} label="Foto do Produto" />
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Estoque ({stockKeys.length}/1000)</Label>
-              <Button type="button" size="sm" onClick={handleAddKey} disabled={stockKeys.length >= 1000}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Chave
-              </Button>
-            </div>
-
-            <ScrollArea className="h-64 border rounded-lg p-4">
-              <div className="space-y-2">
-                {stockKeys.map((key, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={key}
-                      onChange={(e) => handleUpdateKey(index, e.target.value)}
-                      placeholder={`Chave ${index + 1}`}
-                    />
-                    <Button type="button" variant="destructive" size="sm" onClick={() => handleRemoveKey(index)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-                {stockKeys.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma chave adicionada</p>
-                )}
-              </div>
-            </ScrollArea>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="infinite-stock"
+              checked={isInfiniteStock}
+              onChange={(e) => setIsInfiniteStock(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <Label htmlFor="infinite-stock">Estoque Infinito (cliente deve abrir ticket no Discord)</Label>
           </div>
+
+          {!isInfiniteStock && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Estoque ({stockKeys.length}/1000)</Label>
+                <Button type="button" size="sm" onClick={handleAddKey} disabled={stockKeys.length >= 1000}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Chave
+                </Button>
+              </div>
+
+              <ScrollArea className="h-64 border rounded-lg p-4">
+                <div className="space-y-2">
+                  {stockKeys.map((key, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={key}
+                        onChange={(e) => handleUpdateKey(index, e.target.value)}
+                        placeholder={`Chave ${index + 1}`}
+                      />
+                      <Button type="button" variant="destructive" size="sm" onClick={() => handleRemoveKey(index)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {stockKeys.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">Nenhuma chave adicionada</p>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
 
           <div className="flex gap-2">
             <Button onClick={handleSubmit} disabled={loading}>
