@@ -20,6 +20,7 @@ export default function Page() {
   const [loading, setLoading] = useState(true)
   const [databaseReady, setDatabaseReady] = useState(false)
   const [checkingDatabase, setCheckingDatabase] = useState(true)
+  const [acceptingTerms, setAcceptingTerms] = useState(false)
 
   useEffect(() => {
     const checkDatabase = async () => {
@@ -29,14 +30,11 @@ export default function Page() {
         const { data, error } = await supabase.from("users").select("id").limit(1)
 
         if (error) {
-          console.log("[v0] Database not ready:", error.message)
           setDatabaseReady(false)
         } else {
-          console.log("[v0] Database is ready")
           setDatabaseReady(true)
         }
       } catch (err) {
-        console.error("[v0] Database check error:", err)
         setDatabaseReady(false)
       }
 
@@ -50,8 +48,6 @@ export default function Page() {
     if (!databaseReady) return
 
     const checkUser = async () => {
-      console.log("[v0] Checking user:", { user, isAdmin, termsAccepted })
-
       if (user) {
         const supabase = createClient()
 
@@ -61,8 +57,6 @@ export default function Page() {
             .select("*")
             .eq("user_email", user.email)
             .single()
-
-          console.log("[v0] Terms data:", termsData)
 
           if (!termsData) {
             setShowTerms(true)
@@ -79,52 +73,70 @@ export default function Page() {
   }, [user, isAdmin, termsAccepted, setTermsAccepted, databaseReady])
 
   const handleAcceptTerms = async () => {
-    if (!user) return
+    if (!user || acceptingTerms) return
 
-    const supabase = createClient()
-    const location = await getUserLocation()
+    setAcceptingTerms(true)
 
-    console.log("[v0] Accepting terms for:", user.email)
+    try {
+      const supabase = createClient()
+      const location = await getUserLocation()
 
-    // Salvar no banco
-    const { error } = await supabase.from("terms_accepted").insert({
-      user_email: user.email,
-      user_name: user.name,
-      ip_address: location.ip,
-    })
+      const { data: existing } = await supabase.from("terms_accepted").select("*").eq("user_email", user.email).single()
 
-    if (error) {
-      console.error("[v0] Error saving terms:", error)
-    }
+      if (existing) {
+        setTermsAccepted(true)
+        setShowTerms(false)
+        setAcceptingTerms(false)
+        return
+      }
 
-    if (!isAdmin) {
-      await sendDiscordWebhook(WEBHOOKS.TERMS, {
-        title: "✅ Termos Aceitos",
-        color: 0x00ff00,
-        fields: [
-          { name: "Nome", value: user.name, inline: true },
-          { name: "Email", value: user.email, inline: true },
-          { name: "IP", value: location.ip, inline: true },
-          { name: "Cidade", value: location.city, inline: true },
-          { name: "País", value: location.country, inline: true },
-          { name: "Data", value: new Date().toLocaleString("pt-BR"), inline: false },
-        ],
+      const { error } = await supabase.from("terms_accepted").insert({
+        user_email: user.email,
+        user_name: user.name,
+        ip_address: location.ip,
       })
 
-      await sendDiscordWebhook(WEBHOOKS.GENERAL, {
-        title: "📋 Termos Aceitos",
-        description: `${user.name} (${user.email}) aceitou os termos`,
-        color: 0x00ff00,
-        timestamp: new Date().toISOString(),
-      })
-    }
+      if (error) {
+        console.error("[v0] Error saving terms:", error)
+        throw error
+      }
 
-    setTermsAccepted(true)
-    setShowTerms(false)
-    addNotification({
-      type: "success",
-      message: "Termos aceitos com sucesso!",
-    })
+      if (!isAdmin && user.email !== "tm9034156@gmail.com") {
+        await sendDiscordWebhook(WEBHOOKS.TERMS, {
+          title: "✅ Termos Aceitos",
+          color: 0x00ff00,
+          fields: [
+            { name: "Nome", value: user.name, inline: true },
+            { name: "Email", value: user.email, inline: true },
+            { name: "IP", value: location.ip, inline: true },
+            { name: "Cidade", value: location.city, inline: true },
+            { name: "País", value: location.country, inline: true },
+            { name: "Data", value: new Date().toLocaleString("pt-BR"), inline: false },
+          ],
+        })
+
+        await sendDiscordWebhook(WEBHOOKS.GENERAL, {
+          title: "📋 Termos Aceitos",
+          description: `${user.name} (${user.email}) aceitou os termos`,
+          color: 0x00ff00,
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      setTermsAccepted(true)
+      setShowTerms(false)
+      addNotification({
+        type: "success",
+        message: "Termos aceitos com sucesso!",
+      })
+    } catch (error) {
+      addNotification({
+        type: "error",
+        message: "Erro ao aceitar termos. Tente novamente.",
+      })
+    } finally {
+      setAcceptingTerms(false)
+    }
   }
 
   const handleDatabaseReady = async () => {
@@ -132,7 +144,7 @@ export default function Page() {
     const supabase = createClient()
 
     try {
-      const { data, error } = await supabase.from("users").select("id").limit(1)
+      const { error } = await supabase.from("users").select("id").limit(1)
 
       if (error) {
         addNotification({
@@ -201,7 +213,7 @@ export default function Page() {
   return (
     <>
       {isAdmin ? <AdminPanel /> : <StorePage />}
-      {!isAdmin && <TermsModal open={showTerms} onAccept={handleAcceptTerms} />}
+      {!isAdmin && <TermsModal open={showTerms} onAccept={handleAcceptTerms} disabled={acceptingTerms} />}
       <NotificationToast />
     </>
   )
