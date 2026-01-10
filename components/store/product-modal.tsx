@@ -19,7 +19,7 @@ interface Product {
   description: string
   price: number
   photo_url: string
-  stock: number
+  stock: number | string // Permitir string para "inf"
 }
 
 interface ProductModalProps {
@@ -36,6 +36,9 @@ export function ProductModal({ product, open, onOpenChange }: ProductModalProps)
   const { addNotification } = useNotificationStore()
 
   if (!product) return null
+
+  const isInfinite = product.stock === "inf" || product.stock === "INF"
+  const isOutOfStock = !isInfinite && typeof product.stock === "number" && product.stock === 0
 
   const finalPrice = appliedCoupon ? product.price * (1 - appliedCoupon.discount / 100) : product.price
 
@@ -62,7 +65,7 @@ export function ProductModal({ product, open, onOpenChange }: ProductModalProps)
   }
 
   const handleBuy = () => {
-    if (product.stock === 0) {
+    if (isOutOfStock) {
       addNotification({ type: "error", message: "Produto sem estoque" })
       return
     }
@@ -96,8 +99,18 @@ export function ProductModal({ product, open, onOpenChange }: ProductModalProps)
 
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Estoque disponível</p>
-                <p className="text-base sm:text-lg font-semibold">{product.stock} unidades</p>
+                <p className="text-base sm:text-lg font-semibold">
+                  {isInfinite ? "∞ Ilimitado" : `${product.stock} unidades`}
+                </p>
               </div>
+
+              {isInfinite && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <p className="text-xs sm:text-sm text-blue-700 font-medium">
+                    🎫 Este produto requer atendimento personalizado. Após a compra, abra um ticket no Discord.
+                  </p>
+                </div>
+              )}
 
               <Separator />
 
@@ -160,14 +173,9 @@ export function ProductModal({ product, open, onOpenChange }: ProductModalProps)
                 </div>
               </div>
 
-              <Button
-                onClick={handleBuy}
-                size="lg"
-                className="w-full text-sm sm:text-base"
-                disabled={product.stock === 0}
-              >
+              <Button onClick={handleBuy} size="lg" className="w-full text-sm sm:text-base" disabled={isOutOfStock}>
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                {product.stock === 0 ? "Sem Estoque" : "Comprar Agora"}
+                {isOutOfStock ? "Sem Estoque" : "Comprar Agora"}
               </Button>
             </div>
           </div>
