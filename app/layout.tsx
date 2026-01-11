@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Balneário Store",
-  description: "Loja de vendas de itens, gamepass etc, do Balneário Roleplay.",
+  title: "Nebrasca Store",
+  description: "Loja de vendas de itens, gamepass etc, do Nebrasca Roleplay.",
   generator: "v0.app",
   icons: {
     icon: [
